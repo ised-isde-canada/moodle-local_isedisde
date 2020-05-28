@@ -368,30 +368,39 @@ if (!empty($SESSION->loginerrormsg)) {
 $PAGE->set_title("$site->fullname: $loginsite");
 $PAGE->set_heading("$site->fullname");
 
+// ==========================================================================================================
+// Customized section.
+// ==========================================================================================================
 if (isloggedin() and !isguestuser()) {
     echo $OUTPUT->header();
-    // prevent logging when already logged in, we do not want them to relogin by accident because sesskey would be changed
-    echo $OUTPUT->box_start();
-    $logout = new single_button(new moodle_url('/login/logout.php', array('sesskey'=>sesskey(),'loginpage'=>1)), get_string('logout'), 'post');
+    // Prevent logging when already logged in, we do not want them to relogin by accident because sesskey would be changed.
+    // If the user is logged-in using Oauth2 and there is an alternatelogouturl defined, use it for the logout button.
+    if ($USER->auth == 'oauth2' && (!empty($alternatelogouturl = $CFG->alternatelogouturl)
+            || !empty($alternatelogouturl = get_config('theme_gcweb', 'alternatelogouturl')))) {
+        $alternatelogouturl = format_string($alternatelogouturl, true,
+                ['context' => context_course::instance(SITEID), "escape" => false]);
+        $alternatelogouturl = new moodle_url($alternatelogouturl);
+    } else {
+        $alternatelogouturl = new moodle_url('/login/logout.php', array('sesskey'=>sesskey(),'loginpage'=>1));
+    }
+    $logout = new single_button($alternatelogouturl, get_string('logout'), 'get');
     $continue = new single_button(new moodle_url('/'), get_string('cancel'), 'get');
+    echo $OUTPUT->box_start();
     echo $OUTPUT->confirm(get_string('alreadyloggedin', 'error', fullname($USER)), $logout, $continue);
     echo $OUTPUT->box_end();
 } else {
-    // ==========================================================================================================
-    // Customization - If there is only one identity provider, redirect to its login page.
-    // ==========================================================================================================
     require_once($CFG->libdir . '/authlib.php');
     $authsequence = get_enabled_auth_plugins(true);
+    // If there is only one identity provider, redirect to its login page.
     $identityproviders = \auth_plugin_base::get_identity_providers($authsequence);
     if(count($identityproviders) == 1) {
         redirect($identityproviders[0]['url']);
     }
-    // ==========================================================================================================
-
     echo $OUTPUT->header();
     $loginform = new \core_auth\output\login($authsequence, $frm->username);
     $loginform->set_error($errormsg);
     echo $OUTPUT->render($loginform);
 }
+// ==========================================================================================================
 
 echo $OUTPUT->footer();
